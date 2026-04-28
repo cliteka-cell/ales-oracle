@@ -1,0 +1,9 @@
+.env
+.streamlit/secrets.toml
+__pycache__/
+*.pyc
+*.csv
+exam_images_dataset/
+outputs/
+graphs/
+data/
