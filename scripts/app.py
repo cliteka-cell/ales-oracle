@@ -68,6 +68,8 @@ def temizle(text: str) -> str:
     text = re.sub(r'\\text\{(.+?)\}', r'\1', text)
     # Convert numbered list lines (e.g. "1. foo") to dashes to avoid markdown ordered list rendering
     text = re.sub(r'(?m)^\s*\d+\.\s+', '- ', text)
+    # Gemini sometimes wraps math in backticks instead of $...$
+    text = re.sub(r'`([^`]+)`', r'$\1$', text)
     return text.strip()
 
 
