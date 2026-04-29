@@ -1,10 +1,9 @@
 import os
 import re
-import time
 from pathlib import Path
 import pandas as pd
 import streamlit as st
-from streamlit_autorefresh import st_autorefresh
+import streamlit.components.v1 as components
 from google import genai
 from dotenv import load_dotenv
 
@@ -165,78 +164,96 @@ ornek_sorular = df_sayisal[df_sayisal['Ana Konu'] == konu]['Soru Metni'].tolist(
 ornek_metin = "\n".join(f"- {s}" for s in ornek_sorular)
 
 # ── Kronometre / Zamanlayıcı ──────────────────────────────────────────────────
-for _k, _v in [("t_running", False), ("t_start", None), ("t_elapsed", 0.0),
-               ("t_mode", "sw"), ("t_cd_min", 30), ("t_min", False)]:
-    if _k not in st.session_state:
-        st.session_state[_k] = _v
-
-if st.session_state.t_running:
-    st_autorefresh(interval=1000, key="timer_tick")
-
-def _fmt(secs):
-    secs = max(0, int(secs))
-    m, s = divmod(secs, 60)
-    h, m = divmod(m, 60)
-    return f"{h:02d}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
-
-_now = time.time()
-if st.session_state.t_running and st.session_state.t_start:
-    if st.session_state.t_mode == "sw":
-        _elapsed = _now - st.session_state.t_start + st.session_state.t_elapsed
-    else:
-        _elapsed = st.session_state.t_elapsed - (_now - st.session_state.t_start)
-else:
-    _elapsed = st.session_state.t_elapsed
-
-if st.session_state.t_running and st.session_state.t_mode == "cd" and _elapsed <= 0:
-    st.session_state.t_running = False
-    st.session_state.t_elapsed = 0.0
-    _elapsed = 0.0
-
-with st.container(border=True):
-    _hcol1, _hcol2, _hcol3 = st.columns([3, 2, 1])
-    with _hcol1:
-        _mode_label = "⏱ Kronometre" if st.session_state.t_mode == "sw" else "⏳ Geri Sayım"
-        st.markdown(f"**{_mode_label}**")
-    with _hcol2:
-        if st.session_state.t_mode == "cd" and _elapsed <= 60 and _elapsed > 0:
-            st.markdown(f"## :red[{_fmt(_elapsed)}]")
-        else:
-            st.markdown(f"## {_fmt(_elapsed)}")
-    with _hcol3:
-        if st.button("—" if not st.session_state.t_min else "+", key="t_minbtn"):
-            st.session_state.t_min = not st.session_state.t_min
-
-    if not st.session_state.t_min:
-        _tc1, _tc2 = st.columns(2)
-        with _tc1:
-            if st.button("⏱ Kronometre", type=("primary" if st.session_state.t_mode == "sw" else "secondary"), use_container_width=True, key="t_sw"):
-                st.session_state.t_mode = "sw"
-                st.session_state.t_running = False
-                st.session_state.t_elapsed = 0.0
-        with _tc2:
-            if st.button("⏳ Geri Sayım", type=("primary" if st.session_state.t_mode == "cd" else "secondary"), use_container_width=True, key="t_cd"):
-                st.session_state.t_mode = "cd"
-                st.session_state.t_running = False
-                st.session_state.t_elapsed = float(st.session_state.t_cd_min * 60)
-
-        if st.session_state.t_mode == "cd" and not st.session_state.t_running:
-            st.session_state.t_cd_min = st.number_input("Dakika", min_value=1, max_value=180, value=st.session_state.t_cd_min, key="t_cd_input")
-            st.session_state.t_elapsed = float(st.session_state.t_cd_min * 60)
-
-        _bc1, _bc2, _bc3 = st.columns(3)
-        with _bc1:
-            if st.button("▶ Başlat", disabled=st.session_state.t_running, use_container_width=True, key="t_start"):
-                st.session_state.t_start = time.time()
-                st.session_state.t_running = True
-        with _bc2:
-            if st.button("⏸ Durdur", disabled=not st.session_state.t_running, use_container_width=True, key="t_stop"):
-                st.session_state.t_elapsed = _elapsed
-                st.session_state.t_running = False
-        with _bc3:
-            if st.button("↺ Sıfırla", use_container_width=True, key="t_reset"):
-                st.session_state.t_running = False
-                st.session_state.t_elapsed = float(st.session_state.t_cd_min * 60) if st.session_state.t_mode == "cd" else 0.0
+_dark = st.session_state.get("dark_mode", False)
+_timer_html = (
+    "<style>"
+    ":root{"
+    "--bg:" + ("#1e1e2e" if _dark else "#f8f9fa") + ";"
+    "--card:" + ("#2a2a3e" if _dark else "#ffffff") + ";"
+    "--border:" + ("rgba(255,255,255,0.12)" if _dark else "rgba(0,0,0,0.10)") + ";"
+    "--tx:" + ("#e0e0e0" if _dark else "#333") + ";"
+    "--mu:" + ("#999" if _dark else "#666") + ";"
+    "--inp:" + ("rgba(255,255,255,0.07)" if _dark else "rgba(0,0,0,0.04)") + ";"
+    "}"
+    "* { box-sizing:border-box; margin:0; padding:0; font-family:-apple-system,sans-serif; }"
+    "body { background:var(--bg); padding:4px 0 6px; }"
+    ".w { border:1px solid var(--border); border-radius:12px; overflow:hidden; background:var(--card); }"
+    ".hd { display:flex; justify-content:space-between; align-items:center; padding:9px 14px;"
+    "      background:rgba(41,128,185,0.15); cursor:pointer; user-select:none; }"
+    ".hl { font-size:13px; font-weight:700; color:#4da6e0; }"
+    ".hr { display:flex; align-items:center; gap:10px; }"
+    ".mt { font-size:13px; font-weight:700; color:var(--tx); display:none; }"
+    ".mb { background:none; border:1px solid var(--border); color:var(--mu); cursor:pointer;"
+    "      font-size:13px; padding:1px 8px; border-radius:5px; }"
+    ".bd { padding:12px 14px 14px; }"
+    ".tabs { display:flex; gap:6px; margin-bottom:10px; }"
+    ".tab { flex:1; padding:5px 0; text-align:center; font-size:12px; border-radius:7px;"
+    "       cursor:pointer; border:1px solid var(--border); color:var(--mu); background:transparent; }"
+    ".tab.on { background:#2980b9; color:#fff; border-color:#2980b9; }"
+    ".dp { text-align:center; font-size:38px; font-weight:800; color:var(--tx);"
+    "      letter-spacing:3px; margin:6px 0 10px; font-variant-numeric:tabular-nums; }"
+    ".dp.warn { color:#e74c3c; }"
+    ".cr { display:none; align-items:center; justify-content:center; gap:8px; margin-bottom:8px; }"
+    ".cr label { font-size:12px; color:var(--mu); }"
+    ".cr input { width:64px; padding:4px 8px; border-radius:6px; border:1px solid var(--border);"
+    "            background:var(--inp); color:var(--tx); font-size:13px; text-align:center; }"
+    ".ct { display:flex; gap:8px; }"
+    ".btn { flex:1; padding:7px 0; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:700; }"
+    ".go  { background:#27ae60; color:#fff; }"
+    ".stp { background:#c0392b; color:#fff; }"
+    ".rst { background:var(--inp); color:var(--mu); border:1px solid var(--border); }"
+    "</style>"
+    "<div class='w'>"
+    "<div class='hd' onclick='toggleMin()'>"
+    "<div class='hl'>⏱ <span id='ml'>Kronometre</span></div>"
+    "<div class='hr'><span class='mt' id='mt'>00:00</span>"
+    "<button class='mb' id='mb' onclick='event.stopPropagation();toggleMin()'>—</button></div>"
+    "</div>"
+    "<div class='bd' id='bd'>"
+    "<div class='tabs'>"
+    "<button class='tab on' id='t1' onclick=\"setMode('sw')\">⏱ Kronometre</button>"
+    "<button class='tab'    id='t2' onclick=\"setMode('cd')\">⏳ Geri Sayım</button>"
+    "</div>"
+    "<div class='cr' id='cr'><label>Dakika:</label>"
+    "<input type='number' id='mi' value='30' min='1' max='180'></div>"
+    "<div class='dp' id='dp'>00:00</div>"
+    "<div class='ct'>"
+    "<button class='btn go' id='gb' onclick='toggle()'>▶ Başlat</button>"
+    "<button class='btn rst' onclick='reset()'>↺ Sıfırla</button>"
+    "</div></div></div>"
+    "<script>"
+    "var mode='sw',run=false,iv=null,s=0,min=false;"
+    "function fmt(x){var h=Math.floor(x/3600),m=Math.floor((x%3600)/60),sc=x%60;"
+    "return (h?String(h).padStart(2,'0')+':':'')+String(m).padStart(2,'0')+':'+String(sc).padStart(2,'0');}"
+    "function upd(x){document.getElementById('dp').textContent=fmt(x);"
+    "document.getElementById('dp').className='dp'+(mode==='cd'&&x<=60&&x>0?' warn':'');"
+    "document.getElementById('mt').textContent=fmt(x);}"
+    "function setMode(m){mode=m;reset();"
+    "document.getElementById('t1').className='tab'+(m==='sw'?' on':'');"
+    "document.getElementById('t2').className='tab'+(m==='cd'?' on':'');"
+    "document.getElementById('cr').style.display=m==='cd'?'flex':'none';"
+    "document.getElementById('ml').textContent=m==='sw'?'Kronometre':'Geri Sayım';}"
+    "function toggle(){if(run){clearInterval(iv);run=false;"
+    "document.getElementById('gb').textContent='▶ Devam';"
+    "document.getElementById('gb').className='btn go';}else{"
+    "if(mode==='cd'&&s===0)s=parseInt(document.getElementById('mi').value)*60;"
+    "run=true;document.getElementById('gb').textContent='⏸ Durdur';"
+    "document.getElementById('gb').className='btn stp';"
+    "iv=setInterval(function(){mode==='sw'?s++:s--;upd(s);"
+    "if(mode==='cd'&&s<=0){clearInterval(iv);run=false;s=0;"
+    "document.getElementById('dp').textContent='Süre Doldu!';"
+    "document.getElementById('gb').textContent='▶ Başlat';"
+    "document.getElementById('gb').className='btn go';}},1000);}}"
+    "function reset(){clearInterval(iv);run=false;s=0;upd(0);"
+    "document.getElementById('gb').textContent='▶ Başlat';"
+    "document.getElementById('gb').className='btn go';}"
+    "function toggleMin(){min=!min;"
+    "document.getElementById('bd').style.display=min?'none':'block';"
+    "document.getElementById('mt').style.display=min?'inline':'none';"
+    "document.getElementById('mb').textContent=min?'+':'—';}"
+    "</script>"
+)
+components.html(_timer_html, height=220)
 
 # ── Soru üret ────────────────────────────────────────────────────────────────
 if st.button("✨ Soru Oluştur", type="primary", use_container_width=True):
