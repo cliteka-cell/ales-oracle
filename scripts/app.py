@@ -3,7 +3,6 @@ import re
 from pathlib import Path
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
 from google import genai
 from dotenv import load_dotenv
 
@@ -41,7 +40,7 @@ with col_title:
     st.title("📐 ALES Oracle — Soru Üretici")
     st.caption("Gerçek sınav verisiyle eğitilmiş konu bazlı pratik sistemi")
 with col_theme:
-    st.write("")  # dikey hizalama için boşluk
+    st.write("")
     dark = st.toggle("🌙", value=st.session_state.get("dark_mode", False))
     st.session_state["dark_mode"] = dark
 
@@ -67,7 +66,7 @@ def temizle(text: str) -> str:
     text = re.sub(r'\\item\s*', '- ', text)
     text = re.sub(r'\\textbf\{(.+?)\}', r'**\1**', text)
     text = re.sub(r'\\text\{(.+?)\}', r'\1', text)
-    # Convert numbered list lines (e.g. "1. foo") to dashes to avoid markdown ordered list rendering
+    # Convert numbered list lines to dashes to avoid markdown ordered list rendering
     text = re.sub(r'(?m)^\s*\d+\.\s+', '- ', text)
     # Convert backtick-wrapped content to inline LaTeX (Gemini sometimes uses backticks for math)
     text = re.sub(r'`([^`]+)`', r'$\1$', text)
@@ -82,8 +81,6 @@ def sorulari_ayristir(text: str):
     for i in range(1, len(bloklar), 2):
         no = bloklar[i]
         icerik = bloklar[i + 1].strip() if i + 1 < len(bloklar) else ""
-        # A) B) C) D) dört şıkkın art arda geldiği bloğu ara
-        # '\n' + icerik ile A) satır başında olmasa da yakalarız
         sik_match = re.search(
             r'\n(A\)[^\n]+)\n(B\)[^\n]+)\n(C\)[^\n]+)\n(D\)[^\n]+)',
             '\n' + icerik
@@ -167,130 +164,8 @@ zorluk_aciklama = {
 ornek_sorular = df_sayisal[df_sayisal['Ana Konu'] == konu]['Soru Metni'].tolist()[:10]
 ornek_metin = "\n".join(f"- {s}" for s in ornek_sorular)
 
-# ── Kronometre / Zamanlayıcı ──────────────────────────────────────────────────
-_dark = st.session_state.get("dark_mode", False)
-_css_vars = (
-    f"<style>:root{{"
-    f"--bg:{'#1e1e2e' if _dark else '#f8f9fa'};"
-    f"--card:{'#2a2a3e' if _dark else '#ffffff'};"
-    f"--border:{'rgba(255,255,255,0.12)' if _dark else 'rgba(0,0,0,0.10)'};"
-    f"--text:{'#e0e0e0' if _dark else '#333'};"
-    f"--muted:{'#888' if _dark else '#666'};"
-    f"--inp:{'rgba(255,255,255,0.07)' if _dark else 'rgba(0,0,0,0.04)'};"
-    f"}}</style>"
-)
-components.html(_css_vars + """
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
-  body { background: var(--bg); padding: 4px 0 8px 0; }
-  .widget { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--card); }
-  .header { display: flex; justify-content: space-between; align-items: center;
-    padding: 9px 14px; cursor: pointer; background: rgba(41,128,185,0.15); user-select: none; }
-  .header-left { font-size: 13px; font-weight: 700; color: #4da6e0; }
-  .header-right { display: flex; align-items: center; gap: 10px; }
-  .mini-time { font-size: 13px; font-weight: 700; color: var(--text); display: none; }
-  .min-btn { background: none; border: 1px solid var(--border); color: var(--muted); cursor: pointer;
-             font-size: 13px; padding: 1px 8px; border-radius: 5px; }
-  .body { padding: 12px 14px 14px; }
-  .tabs { display: flex; gap: 6px; margin-bottom: 10px; }
-  .tab { flex: 1; padding: 5px 0; text-align: center; font-size: 12px; border-radius: 7px; cursor: pointer;
-         border: 1px solid var(--border); color: var(--muted); background: transparent; transition: all .15s; }
-  .tab.active { background: #2980b9; color: #fff; border-color: #2980b9; }
-  .display { text-align: center; font-size: 38px; font-weight: 800; color: var(--text);
-             letter-spacing: 3px; margin: 6px 0 10px; font-variant-numeric: tabular-nums; }
-  .display.warn { color: #e74c3c; }
-  .cd-row { display: none; align-items: center; justify-content: center; gap: 8px; margin-bottom: 8px; }
-  .cd-row label { font-size: 12px; color: var(--muted); }
-  .cd-row input { width: 64px; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border);
-                  background: var(--inp); color: var(--text); font-size: 13px; text-align: center; }
-  .controls { display: flex; gap: 8px; }
-  .btn { flex: 1; padding: 7px 0; border: none; border-radius: 8px; cursor: pointer;
-         font-size: 13px; font-weight: 700; transition: background .15s; }
-  .btn-go   { background: #27ae60; color: #fff; }
-  .btn-stop { background: #c0392b; color: #fff; }
-  .btn-rst  { background: var(--inp); color: var(--muted); border: 1px solid var(--border); }
-</style>
-<div class="widget">
-  <div class="header" onclick="toggleMin()">
-    <div class="header-left">⏱ <span id="modeLabel">Kronometre</span></div>
-    <div class="header-right">
-      <span class="mini-time" id="miniTime">00:00</span>
-      <button class="min-btn" id="minBtn" onclick="event.stopPropagation();toggleMin()">—</button>
-    </div>
-  </div>
-  <div class="body" id="body">
-    <div class="tabs">
-      <button class="tab active" id="t1" onclick="setMode('sw')">⏱ Kronometre</button>
-      <button class="tab"        id="t2" onclick="setMode('cd')">⏳ Geri Sayım</button>
-    </div>
-    <div class="cd-row" id="cdRow">
-      <label>Dakika:</label>
-      <input type="number" id="minInput" value="30" min="1" max="180">
-    </div>
-    <div class="display" id="disp">00:00</div>
-    <div class="controls">
-      <button class="btn btn-go" id="goBtn" onclick="toggle()">▶ Başlat</button>
-      <button class="btn btn-rst" onclick="reset()">↺ Sıfırla</button>
-    </div>
-  </div>
-</div>
-<script>
-  let mode = 'sw', running = false, iv = null, secs = 0, minimized = false;
-  function fmt(s) {
-    const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sc = s%60;
-    return (h ? String(h).padStart(2,'0')+':' : '') + String(m).padStart(2,'0') + ':' + String(sc).padStart(2,'0');
-  }
-  function setDisp(s) {
-    document.getElementById('disp').textContent = fmt(s);
-    document.getElementById('disp').className = 'display' + (mode==='cd' && s<=60 && s>0 ? ' warn' : '');
-    document.getElementById('miniTime').textContent = fmt(s);
-  }
-  function setMode(m) {
-    mode = m; reset();
-    document.getElementById('t1').className = 'tab' + (m==='sw' ? ' active' : '');
-    document.getElementById('t2').className = 'tab' + (m==='cd' ? ' active' : '');
-    document.getElementById('cdRow').style.display = m==='cd' ? 'flex' : 'none';
-    document.getElementById('modeLabel').textContent = m==='sw' ? 'Kronometre' : 'Geri Sayım';
-  }
-  function toggle() {
-    if (running) {
-      clearInterval(iv); running = false;
-      document.getElementById('goBtn').textContent = '▶ Devam';
-      document.getElementById('goBtn').className = 'btn btn-go';
-    } else {
-      if (mode==='cd' && secs===0) secs = parseInt(document.getElementById('minInput').value) * 60;
-      running = true;
-      document.getElementById('goBtn').textContent = '⏸ Durdur';
-      document.getElementById('goBtn').className = 'btn btn-stop';
-      iv = setInterval(function() {
-        mode==='sw' ? secs++ : secs--;
-        setDisp(secs);
-        if (mode==='cd' && secs<=0) {
-          clearInterval(iv); running=false; secs=0;
-          document.getElementById('disp').textContent = 'Süre Doldu!';
-          document.getElementById('goBtn').textContent = '▶ Başlat';
-          document.getElementById('goBtn').className = 'btn btn-go';
-        }
-      }, 1000);
-    }
-  }
-  function reset() {
-    clearInterval(iv); running=false; secs=0; setDisp(0);
-    document.getElementById('goBtn').textContent = '▶ Başlat';
-    document.getElementById('goBtn').className = 'btn btn-go';
-  }
-  function toggleMin() {
-    minimized = !minimized;
-    document.getElementById('body').style.display = minimized ? 'none' : 'block';
-    document.getElementById('miniTime').style.display = minimized ? 'inline' : 'none';
-    document.getElementById('minBtn').textContent = minimized ? '+' : '—';
-  }
-</script>
-""", height=220)
-
 # ── Soru üret ────────────────────────────────────────────────────────────────
 if st.button("✨ Soru Oluştur", type="primary", use_container_width=True):
-
     st.session_state.pop("sorular_ham", None)
     st.session_state.pop("cevaplar_ham", None)
 
@@ -352,7 +227,6 @@ if "sorular_ham" in st.session_state:
         for soru in sorular:
             soru_karti_goster(soru)
     else:
-        # Parse başarısız olursa ham metni göster
         st.markdown(temizle(st.session_state["sorular_ham"]))
 
     # ── Cevap anahtarı ────────────────────────────────────────────────────────
