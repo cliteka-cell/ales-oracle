@@ -169,50 +169,46 @@ ornek_metin = "\n".join(f"- {s}" for s in ornek_sorular)
 
 # ── Kronometre / Zamanlayıcı ──────────────────────────────────────────────────
 _dark = st.session_state.get("dark_mode", False)
-_bg       = "#1e1e2e" if _dark else "#ffffff"
-_card_bg  = "#2a2a3e" if _dark else "#f4f6f9"
-_border   = "rgba(255,255,255,0.12)" if _dark else "rgba(0,0,0,0.12)"
-_text     = "#e0e0e0" if _dark else "#333333"
-_muted    = "#888" if _dark else "#666"
-_input_bg = "rgba(255,255,255,0.07)" if _dark else "rgba(0,0,0,0.05)"
-
-components.html(f"""
+_css_vars = (
+    f"<style>:root{{"
+    f"--bg:{'#1e1e2e' if _dark else '#f8f9fa'};"
+    f"--card:{'#2a2a3e' if _dark else '#ffffff'};"
+    f"--border:{'rgba(255,255,255,0.12)' if _dark else 'rgba(0,0,0,0.10)'};"
+    f"--text:{'#e0e0e0' if _dark else '#333'};"
+    f"--muted:{'#888' if _dark else '#666'};"
+    f"--inp:{'rgba(255,255,255,0.07)' if _dark else 'rgba(0,0,0,0.04)'};"
+    f"}}</style>"
+)
+components.html(_css_vars + """
 <style>
-  * {{ box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }}
-  body {{ background: {_bg}; padding: 4px 0 8px 0; }}
-  .widget {{ border: 1px solid {_border}; border-radius: 12px; overflow: hidden; background: {_card_bg}; }}
-  .header {{
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 9px 14px; cursor: pointer;
-    background: rgba(41,128,185,0.15); user-select: none;
-  }}
-  .header-left {{ font-size: 13px; font-weight: 700; color: #4da6e0; display: flex; align-items: center; gap: 6px; }}
-  .header-right {{ display: flex; align-items: center; gap: 10px; }}
-  .mini-time {{ font-size: 13px; font-weight: 700; color: {_text}; display: none; }}
-  .min-btn {{ background: none; border: 1px solid {_border}; color: {_muted}; cursor: pointer;
-             font-size: 13px; padding: 1px 8px; border-radius: 5px; line-height: 1.4; }}
-  .min-btn:hover {{ background: rgba(128,128,128,0.15); }}
-  .body {{ padding: 12px 14px 14px; }}
-  .tabs {{ display: flex; gap: 6px; margin-bottom: 10px; }}
-  .tab {{ flex: 1; padding: 5px 0; text-align: center; font-size: 12px; border-radius: 7px; cursor: pointer;
-         border: 1px solid {_border}; color: {_muted}; background: transparent; transition: all .15s; }}
-  .tab.active {{ background: #2980b9; color: #fff; border-color: #2980b9; }}
-  .display {{ text-align: center; font-size: 38px; font-weight: 800; color: {_text};
-             letter-spacing: 3px; margin: 6px 0 10px; font-variant-numeric: tabular-nums; }}
-  .display.warn {{ color: #e74c3c; }}
-  .cd-row {{ display: none; align-items: center; justify-content: center; gap: 8px; margin-bottom: 8px; }}
-  .cd-row label {{ font-size: 12px; color: {_muted}; }}
-  .cd-row input {{ width: 64px; padding: 4px 8px; border-radius: 6px; border: 1px solid {_border};
-                  background: {_input_bg}; color: {_text}; font-size: 13px; text-align: center; }}
-  .controls {{ display: flex; gap: 8px; }}
-  .btn {{ flex: 1; padding: 7px 0; border: none; border-radius: 8px; cursor: pointer;
-         font-size: 13px; font-weight: 700; transition: background .15s; }}
-  .btn-go  {{ background: #27ae60; color: #fff; }}
-  .btn-go:hover  {{ background: #2ecc71; }}
-  .btn-stop {{ background: #c0392b; color: #fff; }}
-  .btn-stop:hover {{ background: #e74c3c; }}
-  .btn-rst {{ background: {_input_bg}; color: {_muted}; border: 1px solid {_border}; }}
-  .btn-rst:hover {{ background: rgba(128,128,128,0.2); }}
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+  body { background: var(--bg); padding: 4px 0 8px 0; }
+  .widget { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--card); }
+  .header { display: flex; justify-content: space-between; align-items: center;
+    padding: 9px 14px; cursor: pointer; background: rgba(41,128,185,0.15); user-select: none; }
+  .header-left { font-size: 13px; font-weight: 700; color: #4da6e0; }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .mini-time { font-size: 13px; font-weight: 700; color: var(--text); display: none; }
+  .min-btn { background: none; border: 1px solid var(--border); color: var(--muted); cursor: pointer;
+             font-size: 13px; padding: 1px 8px; border-radius: 5px; }
+  .body { padding: 12px 14px 14px; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+  .tab { flex: 1; padding: 5px 0; text-align: center; font-size: 12px; border-radius: 7px; cursor: pointer;
+         border: 1px solid var(--border); color: var(--muted); background: transparent; transition: all .15s; }
+  .tab.active { background: #2980b9; color: #fff; border-color: #2980b9; }
+  .display { text-align: center; font-size: 38px; font-weight: 800; color: var(--text);
+             letter-spacing: 3px; margin: 6px 0 10px; font-variant-numeric: tabular-nums; }
+  .display.warn { color: #e74c3c; }
+  .cd-row { display: none; align-items: center; justify-content: center; gap: 8px; margin-bottom: 8px; }
+  .cd-row label { font-size: 12px; color: var(--muted); }
+  .cd-row input { width: 64px; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border);
+                  background: var(--inp); color: var(--text); font-size: 13px; text-align: center; }
+  .controls { display: flex; gap: 8px; }
+  .btn { flex: 1; padding: 7px 0; border: none; border-radius: 8px; cursor: pointer;
+         font-size: 13px; font-weight: 700; transition: background .15s; }
+  .btn-go   { background: #27ae60; color: #fff; }
+  .btn-stop { background: #c0392b; color: #fff; }
+  .btn-rst  { background: var(--inp); color: var(--muted); border: 1px solid var(--border); }
 </style>
 <div class="widget">
   <div class="header" onclick="toggleMin()">
@@ -240,23 +236,21 @@ components.html(f"""
 </div>
 <script>
   let mode = 'sw', running = false, iv = null, secs = 0, minimized = false;
-
   function fmt(s) {
     const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sc = s%60;
-    return (h ? String(h).padStart(2,'0')+':' : '') +
-           String(m).padStart(2,'0') + ':' + String(sc).padStart(2,'0');
+    return (h ? String(h).padStart(2,'0')+':' : '') + String(m).padStart(2,'0') + ':' + String(sc).padStart(2,'0');
   }
   function setDisp(s) {
     document.getElementById('disp').textContent = fmt(s);
-    document.getElementById('disp').className = 'display' + (mode==='cd' && s<=60 && s>0 ? ' warn':'');
+    document.getElementById('disp').className = 'display' + (mode==='cd' && s<=60 && s>0 ? ' warn' : '');
     document.getElementById('miniTime').textContent = fmt(s);
   }
   function setMode(m) {
     mode = m; reset();
-    document.getElementById('t1').className = 'tab'+(m==='sw'?' active':'');
-    document.getElementById('t2').className = 'tab'+(m==='cd'?' active':'');
-    document.getElementById('cdRow').style.display = m==='cd' ? 'flex':'none';
-    document.getElementById('modeLabel').textContent = m==='sw' ? 'Kronometre':'Geri Sayım';
+    document.getElementById('t1').className = 'tab' + (m==='sw' ? ' active' : '');
+    document.getElementById('t2').className = 'tab' + (m==='cd' ? ' active' : '');
+    document.getElementById('cdRow').style.display = m==='cd' ? 'flex' : 'none';
+    document.getElementById('modeLabel').textContent = m==='sw' ? 'Kronometre' : 'Geri Sayım';
   }
   function toggle() {
     if (running) {
@@ -264,32 +258,31 @@ components.html(f"""
       document.getElementById('goBtn').textContent = '▶ Devam';
       document.getElementById('goBtn').className = 'btn btn-go';
     } else {
-      if (mode==='cd' && secs===0) secs = parseInt(document.getElementById('minInput').value)*60;
+      if (mode==='cd' && secs===0) secs = parseInt(document.getElementById('minInput').value) * 60;
       running = true;
       document.getElementById('goBtn').textContent = '⏸ Durdur';
       document.getElementById('goBtn').className = 'btn btn-stop';
-      iv = setInterval(()=>{
+      iv = setInterval(function() {
         mode==='sw' ? secs++ : secs--;
         setDisp(secs);
         if (mode==='cd' && secs<=0) {
           clearInterval(iv); running=false; secs=0;
-          document.getElementById('disp').textContent='Süre Doldu!';
-          document.getElementById('goBtn').textContent='▶ Başlat';
-          document.getElementById('goBtn').className='btn btn-go';
+          document.getElementById('disp').textContent = 'Süre Doldu!';
+          document.getElementById('goBtn').textContent = '▶ Başlat';
+          document.getElementById('goBtn').className = 'btn btn-go';
         }
-      },1000);
+      }, 1000);
     }
   }
   function reset() {
-    clearInterval(iv); running=false; secs=0;
-    setDisp(0);
-    document.getElementById('goBtn').textContent='▶ Başlat';
-    document.getElementById('goBtn').className='btn btn-go';
+    clearInterval(iv); running=false; secs=0; setDisp(0);
+    document.getElementById('goBtn').textContent = '▶ Başlat';
+    document.getElementById('goBtn').className = 'btn btn-go';
   }
   function toggleMin() {
     minimized = !minimized;
-    document.getElementById('body').style.display = minimized ? 'none':'block';
-    document.getElementById('miniTime').style.display = minimized ? 'inline':'none';
+    document.getElementById('body').style.display = minimized ? 'none' : 'block';
+    document.getElementById('miniTime').style.display = minimized ? 'inline' : 'none';
     document.getElementById('minBtn').textContent = minimized ? '+' : '—';
   }
 </script>
