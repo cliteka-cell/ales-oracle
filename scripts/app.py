@@ -35,8 +35,28 @@ if not st.session_state.get("authenticated"):
     giris_ekrani()
     st.stop()
 
-st.title("📐 ALES Oracle — Soru Üretici")
-st.caption("Gerçek sınav verisiyle eğitilmiş konu bazlı pratik sistemi")
+col_title, col_theme = st.columns([5, 1])
+with col_title:
+    st.title("📐 ALES Oracle — Soru Üretici")
+    st.caption("Gerçek sınav verisiyle eğitilmiş konu bazlı pratik sistemi")
+with col_theme:
+    st.write("")  # dikey hizalama için boşluk
+    dark = st.toggle("🌙", value=st.session_state.get("dark_mode", False))
+    st.session_state["dark_mode"] = dark
+
+if st.session_state.get("dark_mode"):
+    st.markdown("""
+    <style>
+        [data-testid="stAppViewContainer"] { background-color: #1e1e2e; color: #e0e0e0; }
+        [data-testid="stSidebar"] { background-color: #2a2a3e; }
+        [data-testid="stHeader"] { background-color: #1e1e2e; }
+        div[data-testid="stVerticalBlock"] div[data-testid="stHorizontalBlock"] { background-color: transparent; }
+        .stSelectbox label, .stSlider label { color: #e0e0e0 !important; }
+        div[data-baseweb="select"] > div { background-color: #2a2a3e !important; color: #e0e0e0 !important; }
+        div[data-testid="stContainer"] { background-color: #2a2a3e !important; border-color: #444466 !important; }
+        .stButton button { background-color: #2980b9; color: white; }
+    </style>
+    """, unsafe_allow_html=True)
 
 
 # ── Yardımcı: LaTeX olmayan çevre komutlarını temizle ────────────────────────
