@@ -3,6 +3,7 @@ import re
 from pathlib import Path
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 from google import genai
 from dotenv import load_dotenv
 
@@ -164,8 +165,129 @@ zorluk_aciklama = {
 ornek_sorular = df_sayisal[df_sayisal['Ana Konu'] == konu]['Soru Metni'].tolist()[:10]
 ornek_metin = "\n".join(f"- {s}" for s in ornek_sorular)
 
+# ── Kronometre / Zamanlayıcı ──────────────────────────────────────────────────
+components.html("""
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+  body { background: transparent; padding: 4px 0 8px 0; }
+  .widget { border: 1px solid rgba(128,128,128,0.25); border-radius: 12px; overflow: hidden; }
+  .header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 9px 14px; cursor: pointer;
+    background: rgba(41,128,185,0.15); user-select: none;
+  }
+  .header-left { font-size: 13px; font-weight: 700; color: #4da6e0; display: flex; align-items: center; gap: 6px; }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .mini-time { font-size: 13px; font-weight: 700; color: #ccc; display: none; }
+  .min-btn { background: none; border: 1px solid rgba(128,128,128,0.3); color: #aaa; cursor: pointer;
+             font-size: 13px; padding: 1px 8px; border-radius: 5px; line-height: 1.4; }
+  .min-btn:hover { background: rgba(255,255,255,0.08); }
+  .body { padding: 12px 14px 14px; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+  .tab { flex: 1; padding: 5px 0; text-align: center; font-size: 12px; border-radius: 7px; cursor: pointer;
+         border: 1px solid rgba(128,128,128,0.25); color: #888; background: transparent; transition: all .15s; }
+  .tab.active { background: #2980b9; color: #fff; border-color: #2980b9; }
+  .display { text-align: center; font-size: 38px; font-weight: 800; color: #e0e0e0;
+             letter-spacing: 3px; margin: 6px 0 10px; font-variant-numeric: tabular-nums; }
+  .display.warn { color: #e74c3c; }
+  .cd-row { display: none; align-items: center; justify-content: center; gap: 8px; margin-bottom: 8px; }
+  .cd-row label { font-size: 12px; color: #888; }
+  .cd-row input { width: 64px; padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(128,128,128,0.3);
+                  background: rgba(255,255,255,0.07); color: #ddd; font-size: 13px; text-align: center; }
+  .controls { display: flex; gap: 8px; }
+  .btn { flex: 1; padding: 7px 0; border: none; border-radius: 8px; cursor: pointer;
+         font-size: 13px; font-weight: 700; transition: background .15s; }
+  .btn-go  { background: #27ae60; color: #fff; }
+  .btn-go:hover  { background: #2ecc71; }
+  .btn-stop { background: #c0392b; color: #fff; }
+  .btn-stop:hover { background: #e74c3c; }
+  .btn-rst { background: rgba(255,255,255,0.08); color: #aaa; border: 1px solid rgba(128,128,128,0.2); }
+  .btn-rst:hover { background: rgba(255,255,255,0.14); }
+</style>
+<div class="widget">
+  <div class="header" onclick="toggleMin()">
+    <div class="header-left">⏱ <span id="modeLabel">Kronometre</span></div>
+    <div class="header-right">
+      <span class="mini-time" id="miniTime">00:00</span>
+      <button class="min-btn" id="minBtn" onclick="event.stopPropagation();toggleMin()">—</button>
+    </div>
+  </div>
+  <div class="body" id="body">
+    <div class="tabs">
+      <button class="tab active" id="t1" onclick="setMode('sw')">⏱ Kronometre</button>
+      <button class="tab"        id="t2" onclick="setMode('cd')">⏳ Geri Sayım</button>
+    </div>
+    <div class="cd-row" id="cdRow">
+      <label>Dakika:</label>
+      <input type="number" id="minInput" value="30" min="1" max="180">
+    </div>
+    <div class="display" id="disp">00:00</div>
+    <div class="controls">
+      <button class="btn btn-go" id="goBtn" onclick="toggle()">▶ Başlat</button>
+      <button class="btn btn-rst" onclick="reset()">↺ Sıfırla</button>
+    </div>
+  </div>
+</div>
+<script>
+  let mode = 'sw', running = false, iv = null, secs = 0, minimized = false;
+
+  function fmt(s) {
+    const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sc = s%60;
+    return (h ? String(h).padStart(2,'0')+':' : '') +
+           String(m).padStart(2,'0') + ':' + String(sc).padStart(2,'0');
+  }
+  function setDisp(s) {
+    document.getElementById('disp').textContent = fmt(s);
+    document.getElementById('disp').className = 'display' + (mode==='cd' && s<=60 && s>0 ? ' warn':'');
+    document.getElementById('miniTime').textContent = fmt(s);
+  }
+  function setMode(m) {
+    mode = m; reset();
+    document.getElementById('t1').className = 'tab'+(m==='sw'?' active':'');
+    document.getElementById('t2').className = 'tab'+(m==='cd'?' active':'');
+    document.getElementById('cdRow').style.display = m==='cd' ? 'flex':'none';
+    document.getElementById('modeLabel').textContent = m==='sw' ? 'Kronometre':'Geri Sayım';
+  }
+  function toggle() {
+    if (running) {
+      clearInterval(iv); running = false;
+      document.getElementById('goBtn').textContent = '▶ Devam';
+      document.getElementById('goBtn').className = 'btn btn-go';
+    } else {
+      if (mode==='cd' && secs===0) secs = parseInt(document.getElementById('minInput').value)*60;
+      running = true;
+      document.getElementById('goBtn').textContent = '⏸ Durdur';
+      document.getElementById('goBtn').className = 'btn btn-stop';
+      iv = setInterval(()=>{
+        mode==='sw' ? secs++ : secs--;
+        setDisp(secs);
+        if (mode==='cd' && secs<=0) {
+          clearInterval(iv); running=false; secs=0;
+          document.getElementById('disp').textContent='Süre Doldu!';
+          document.getElementById('goBtn').textContent='▶ Başlat';
+          document.getElementById('goBtn').className='btn btn-go';
+        }
+      },1000);
+    }
+  }
+  function reset() {
+    clearInterval(iv); running=false; secs=0;
+    setDisp(0);
+    document.getElementById('goBtn').textContent='▶ Başlat';
+    document.getElementById('goBtn').className='btn btn-go';
+  }
+  function toggleMin() {
+    minimized = !minimized;
+    document.getElementById('body').style.display = minimized ? 'none':'block';
+    document.getElementById('miniTime').style.display = minimized ? 'inline':'none';
+    document.getElementById('minBtn').textContent = minimized ? '+' : '—';
+  }
+</script>
+""", height=220)
+
 # ── Soru üret ────────────────────────────────────────────────────────────────
 if st.button("✨ Soru Oluştur", type="primary", use_container_width=True):
+
     st.session_state.pop("sorular_ham", None)
     st.session_state.pop("cevaplar_ham", None)
 
