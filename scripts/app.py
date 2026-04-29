@@ -1,9 +1,10 @@
 import os
 import re
+import time
 from pathlib import Path
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
+from streamlit_autorefresh import st_autorefresh
 from google import genai
 from dotenv import load_dotenv
 
@@ -168,8 +169,83 @@ ornek_sorular = df_sayisal[df_sayisal['Ana Konu'] == konu]['Soru Metni'].tolist(
 ornek_metin = "\n".join(f"- {s}" for s in ornek_sorular)
 
 # ── Kronometre / Zamanlayıcı ──────────────────────────────────────────────────
-_dark = st.session_state.get("dark_mode", False)
-_timer_html = (
+for _k, _v in [("t_running", False), ("t_start", None), ("t_elapsed", 0.0), ("t_mode", "sw"), ("t_cd_min", 30), ("t_min", False)]:
+    if _k not in st.session_state:
+        st.session_state[_k] = _v
+
+if st.session_state.t_running:
+    st_autorefresh(interval=1000, key="timer_tick")
+
+def _fmt(secs):
+    secs = max(0, int(secs))
+    m, s = divmod(secs, 60)
+    h, m = divmod(m, 60)
+    return f"{h:02d}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
+
+_now = time.time()
+if st.session_state.t_running and st.session_state.t_start:
+    if st.session_state.t_mode == "sw":
+        _elapsed = _now - st.session_state.t_start + st.session_state.t_elapsed
+    else:
+        _elapsed = st.session_state.t_elapsed - (_now - st.session_state.t_start)
+else:
+    _elapsed = st.session_state.t_elapsed
+
+if st.session_state.t_running and st.session_state.t_mode == "cd" and _elapsed <= 0:
+    st.session_state.t_running = False
+    st.session_state.t_elapsed = 0.0
+    _elapsed = 0.0
+
+with st.container(border=True):
+    _hcol1, _hcol2, _hcol3 = st.columns([3, 2, 1])
+    with _hcol1:
+        _mode_label = "⏱ Kronometre" if st.session_state.t_mode == "sw" else "⏳ Geri Sayım"
+        st.markdown(f"**{_mode_label}**")
+    with _hcol2:
+        _color = "red" if (st.session_state.t_mode == "cd" and _elapsed <= 60 and _elapsed > 0) else "normal"
+        if _color == "red":
+            st.markdown(f"## :red[{_fmt(_elapsed)}]")
+        else:
+            st.markdown(f"## {_fmt(_elapsed)}")
+    with _hcol3:
+        if st.button("—" if not st.session_state.t_min else "+", key="t_minbtn"):
+            st.session_state.t_min = not st.session_state.t_min
+
+    if not st.session_state.t_min:
+        _tc1, _tc2 = st.columns(2)
+        with _tc1:
+            if st.button("⏱ Kronometre", type=("primary" if st.session_state.t_mode=="sw" else "secondary"), use_container_width=True, key="t_sw"):
+                st.session_state.t_mode = "sw"
+                st.session_state.t_running = False
+                st.session_state.t_elapsed = 0.0
+        with _tc2:
+            if st.button("⏳ Geri Sayım", type=("primary" if st.session_state.t_mode=="cd" else "secondary"), use_container_width=True, key="t_cd"):
+                st.session_state.t_mode = "cd"
+                st.session_state.t_running = False
+                st.session_state.t_elapsed = float(st.session_state.t_cd_min * 60)
+
+        if st.session_state.t_mode == "cd" and not st.session_state.t_running:
+            st.session_state.t_cd_min = st.number_input("Dakika", min_value=1, max_value=180, value=st.session_state.t_cd_min, key="t_cd_input")
+            st.session_state.t_elapsed = float(st.session_state.t_cd_min * 60)
+
+        _bc1, _bc2, _bc3 = st.columns(3)
+        with _bc1:
+            if st.button("▶ Başlat", disabled=st.session_state.t_running, use_container_width=True, key="t_start"):
+                st.session_state.t_start = time.time()
+                st.session_state.t_running = True
+        with _bc2:
+            if st.button("⏸ Durdur", disabled=not st.session_state.t_running, use_container_width=True, key="t_stop"):
+                st.session_state.t_elapsed = _elapsed
+                st.session_state.t_running = False
+        with _bc3:
+            if st.button("↺ Sıfırla", use_container_width=True, key="t_reset"):
+                st.session_state.t_running = False
+                st.session_state.t_elapsed = float(st.session_state.t_cd_min * 60) if st.session_state.t_mode == "cd" else 0.0
+
+_TIMER_PLACEHOLDER = None
+
+# ── Soru üret ────────────────────────────────────────────────────────────────
+if st.button("✨ Soru Oluştur", type="primary", use_container_width=True):
     "<style>"
     ":root{"
     "--bg:" + ("#1e1e2e" if _dark else "#f8f9fa") + ";"
@@ -272,6 +348,7 @@ ZORUNLU KURALLAR:
 - Matematik için SADECE inline LaTeX kullan: $formül$ şeklinde
 - Soru metninde liste gerekiyorsa tire ile yaz (- madde), ASLA numaralı liste (1. 2. 3.) veya \\begin{{itemize}} kullanma
 - Şıkları ayrı satırlara yaz: A) ... B) ... C) ... D) ...
+- Şıklardaki sayılar tam sayı veya basit kesir olsun — ondalıklı sayı (81.85 gibi) ASLA kullanma
 
 Referans sorular (bu konudan gerçek sınavda çıkmış):
 {ornek_metin}
