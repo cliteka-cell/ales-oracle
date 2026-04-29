@@ -69,6 +69,8 @@ def temizle(text: str) -> str:
     text = re.sub(r'\\text\{(.+?)\}', r'\1', text)
     # Convert numbered list lines (e.g. "1. foo") to dashes to avoid markdown ordered list rendering
     text = re.sub(r'(?m)^\s*\d+\.\s+', '- ', text)
+    # Convert backtick-wrapped content to inline LaTeX (Gemini sometimes uses backticks for math)
+    text = re.sub(r'`([^`]+)`', r'$\1$', text)
     return text.strip()
 
 
@@ -166,43 +168,51 @@ ornek_sorular = df_sayisal[df_sayisal['Ana Konu'] == konu]['Soru Metni'].tolist(
 ornek_metin = "\n".join(f"- {s}" for s in ornek_sorular)
 
 # ── Kronometre / Zamanlayıcı ──────────────────────────────────────────────────
-components.html("""
+_dark = st.session_state.get("dark_mode", False)
+_bg       = "#1e1e2e" if _dark else "#ffffff"
+_card_bg  = "#2a2a3e" if _dark else "#f4f6f9"
+_border   = "rgba(255,255,255,0.12)" if _dark else "rgba(0,0,0,0.12)"
+_text     = "#e0e0e0" if _dark else "#333333"
+_muted    = "#888" if _dark else "#666"
+_input_bg = "rgba(255,255,255,0.07)" if _dark else "rgba(0,0,0,0.05)"
+
+components.html(f"""
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
-  body { background: transparent; padding: 4px 0 8px 0; }
-  .widget { border: 1px solid rgba(128,128,128,0.25); border-radius: 12px; overflow: hidden; }
-  .header {
+  * {{ box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }}
+  body {{ background: {_bg}; padding: 4px 0 8px 0; }}
+  .widget {{ border: 1px solid {_border}; border-radius: 12px; overflow: hidden; background: {_card_bg}; }}
+  .header {{
     display: flex; justify-content: space-between; align-items: center;
     padding: 9px 14px; cursor: pointer;
     background: rgba(41,128,185,0.15); user-select: none;
-  }
-  .header-left { font-size: 13px; font-weight: 700; color: #4da6e0; display: flex; align-items: center; gap: 6px; }
-  .header-right { display: flex; align-items: center; gap: 10px; }
-  .mini-time { font-size: 13px; font-weight: 700; color: #ccc; display: none; }
-  .min-btn { background: none; border: 1px solid rgba(128,128,128,0.3); color: #aaa; cursor: pointer;
-             font-size: 13px; padding: 1px 8px; border-radius: 5px; line-height: 1.4; }
-  .min-btn:hover { background: rgba(255,255,255,0.08); }
-  .body { padding: 12px 14px 14px; }
-  .tabs { display: flex; gap: 6px; margin-bottom: 10px; }
-  .tab { flex: 1; padding: 5px 0; text-align: center; font-size: 12px; border-radius: 7px; cursor: pointer;
-         border: 1px solid rgba(128,128,128,0.25); color: #888; background: transparent; transition: all .15s; }
-  .tab.active { background: #2980b9; color: #fff; border-color: #2980b9; }
-  .display { text-align: center; font-size: 38px; font-weight: 800; color: #e0e0e0;
-             letter-spacing: 3px; margin: 6px 0 10px; font-variant-numeric: tabular-nums; }
-  .display.warn { color: #e74c3c; }
-  .cd-row { display: none; align-items: center; justify-content: center; gap: 8px; margin-bottom: 8px; }
-  .cd-row label { font-size: 12px; color: #888; }
-  .cd-row input { width: 64px; padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(128,128,128,0.3);
-                  background: rgba(255,255,255,0.07); color: #ddd; font-size: 13px; text-align: center; }
-  .controls { display: flex; gap: 8px; }
-  .btn { flex: 1; padding: 7px 0; border: none; border-radius: 8px; cursor: pointer;
-         font-size: 13px; font-weight: 700; transition: background .15s; }
-  .btn-go  { background: #27ae60; color: #fff; }
-  .btn-go:hover  { background: #2ecc71; }
-  .btn-stop { background: #c0392b; color: #fff; }
-  .btn-stop:hover { background: #e74c3c; }
-  .btn-rst { background: rgba(255,255,255,0.08); color: #aaa; border: 1px solid rgba(128,128,128,0.2); }
-  .btn-rst:hover { background: rgba(255,255,255,0.14); }
+  }}
+  .header-left {{ font-size: 13px; font-weight: 700; color: #4da6e0; display: flex; align-items: center; gap: 6px; }}
+  .header-right {{ display: flex; align-items: center; gap: 10px; }}
+  .mini-time {{ font-size: 13px; font-weight: 700; color: {_text}; display: none; }}
+  .min-btn {{ background: none; border: 1px solid {_border}; color: {_muted}; cursor: pointer;
+             font-size: 13px; padding: 1px 8px; border-radius: 5px; line-height: 1.4; }}
+  .min-btn:hover {{ background: rgba(128,128,128,0.15); }}
+  .body {{ padding: 12px 14px 14px; }}
+  .tabs {{ display: flex; gap: 6px; margin-bottom: 10px; }}
+  .tab {{ flex: 1; padding: 5px 0; text-align: center; font-size: 12px; border-radius: 7px; cursor: pointer;
+         border: 1px solid {_border}; color: {_muted}; background: transparent; transition: all .15s; }}
+  .tab.active {{ background: #2980b9; color: #fff; border-color: #2980b9; }}
+  .display {{ text-align: center; font-size: 38px; font-weight: 800; color: {_text};
+             letter-spacing: 3px; margin: 6px 0 10px; font-variant-numeric: tabular-nums; }}
+  .display.warn {{ color: #e74c3c; }}
+  .cd-row {{ display: none; align-items: center; justify-content: center; gap: 8px; margin-bottom: 8px; }}
+  .cd-row label {{ font-size: 12px; color: {_muted}; }}
+  .cd-row input {{ width: 64px; padding: 4px 8px; border-radius: 6px; border: 1px solid {_border};
+                  background: {_input_bg}; color: {_text}; font-size: 13px; text-align: center; }}
+  .controls {{ display: flex; gap: 8px; }}
+  .btn {{ flex: 1; padding: 7px 0; border: none; border-radius: 8px; cursor: pointer;
+         font-size: 13px; font-weight: 700; transition: background .15s; }}
+  .btn-go  {{ background: #27ae60; color: #fff; }}
+  .btn-go:hover  {{ background: #2ecc71; }}
+  .btn-stop {{ background: #c0392b; color: #fff; }}
+  .btn-stop:hover {{ background: #e74c3c; }}
+  .btn-rst {{ background: {_input_bg}; color: {_muted}; border: 1px solid {_border}; }}
+  .btn-rst:hover {{ background: rgba(128,128,128,0.2); }}
 </style>
 <div class="widget">
   <div class="header" onclick="toggleMin()">
@@ -296,7 +306,7 @@ if st.button("✨ Soru Oluştur", type="primary", use_container_width=True):
 
 ZORUNLU KURALLAR:
 - Her soru gerçek ALES formatında olsun (4 şık: A, B, C, D)
-- Matematik için SADECE inline LaTeX kullan: $formül$ şeklinde
+- Matematik için SADECE inline LaTeX kullan: $formül$ şeklinde — ASLA backtick (`) kullanma
 - Soru metninde liste gerekiyorsa tire ile yaz (- madde), ASLA numaralı liste (1. 2. 3.) veya \\begin{{itemize}} kullanma
 - Şıkları ayrı satırlara yaz: A) ... B) ... C) ... D) ...
 
