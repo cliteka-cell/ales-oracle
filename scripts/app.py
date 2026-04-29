@@ -40,7 +40,7 @@ with col_title:
     st.title("📐 ALES Oracle — Soru Üretici")
     st.caption("Gerçek sınav verisiyle eğitilmiş konu bazlı pratik sistemi")
 with col_theme:
-    st.write("")
+    st.write("")  # dikey hizalama için boşluk
     dark = st.toggle("🌙", value=st.session_state.get("dark_mode", False))
     st.session_state["dark_mode"] = dark
 
@@ -66,24 +66,8 @@ def temizle(text: str) -> str:
     text = re.sub(r'\\item\s*', '- ', text)
     text = re.sub(r'\\textbf\{(.+?)\}', r'**\1**', text)
     text = re.sub(r'\\text\{(.+?)\}', r'\1', text)
-    # Convert numbered list lines to dashes
+    # Convert numbered list lines (e.g. "1. foo") to dashes to avoid markdown ordered list rendering
     text = re.sub(r'(?m)^\s*\d+\.\s+', '- ', text)
-    # Convert backtick-wrapped content to inline LaTeX
-    text = re.sub(r'`([^`]+)`', r'$\1$', text)
-    # Fix bare LaTeX in answer option lines: "A) \frac{3}{16}" → "A) $\frac{3}{16}$"
-    def fix_sik(m):
-        prefix, content = m.group(1), m.group(2).strip()
-        if '\\' in content and '$' not in content:
-            return f"{prefix} ${content}$"
-        return m.group(0)
-    text = re.sub(r'(?m)^([A-D]\))\s*(.+)$', fix_sik, text)
-    # Fix bare LaTeX at the start of a line mixed with Turkish text
-    # e.g. "\left( \frac{...} \right)^{1/2} işleminin sonucu kaçtır?"
-    text = re.sub(
-        r'(?m)^(\\[a-zA-Z(][^\n$]*?)(\s+[a-zA-ZçğışöüÇĞİŞÖÜ][^\n]*)$',
-        r'$\1$\2',
-        text
-    )
     return text.strip()
 
 
@@ -95,6 +79,8 @@ def sorulari_ayristir(text: str):
     for i in range(1, len(bloklar), 2):
         no = bloklar[i]
         icerik = bloklar[i + 1].strip() if i + 1 < len(bloklar) else ""
+        # A) B) C) D) dört şıkkın art arda geldiği bloğu ara
+        # '\n' + icerik ile A) satır başında olmasa da yakalarız
         sik_match = re.search(
             r'\n(A\)[^\n]+)\n(B\)[^\n]+)\n(C\)[^\n]+)\n(D\)[^\n]+)',
             '\n' + icerik
@@ -188,7 +174,7 @@ if st.button("✨ Soru Oluştur", type="primary", use_container_width=True):
 
 ZORUNLU KURALLAR:
 - Her soru gerçek ALES formatında olsun (4 şık: A, B, C, D)
-- Matematik için SADECE inline LaTeX kullan: $formül$ şeklinde — her formülü $ işaretleri arasına yaz, ASLA backtick (`) veya çıplak LaTeX komutu kullanma
+- Matematik için SADECE inline LaTeX kullan: $formül$ şeklinde
 - Soru metninde liste gerekiyorsa tire ile yaz (- madde), ASLA numaralı liste (1. 2. 3.) veya \\begin{{itemize}} kullanma
 - Şıkları ayrı satırlara yaz: A) ... B) ... C) ... D) ...
 
@@ -241,6 +227,7 @@ if "sorular_ham" in st.session_state:
         for soru in sorular:
             soru_karti_goster(soru)
     else:
+        # Parse başarısız olursa ham metni göster
         st.markdown(temizle(st.session_state["sorular_ham"]))
 
     # ── Cevap anahtarı ────────────────────────────────────────────────────────
