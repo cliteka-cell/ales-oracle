@@ -290,7 +290,7 @@ D) [şık]
     with st.spinner(f"{konu} — {zorluk} sorular hazırlanıyor..."):
         try:
             response = client.models.generate_content(
-                model='gemini-2.5-flash',
+                model='gemini-2.5-pro',
                 contents=[prompt]
             )
             if not response.text:
@@ -349,7 +349,7 @@ SORULAR:
         with st.spinner("Çözümler hazırlanıyor..."):
             try:
                 cevap_resp = client.models.generate_content(
-                    model='gemini-2.5-flash',
+                    model='gemini-2.5-pro',
                     contents=[cevap_prompt]
                 )
                 st.session_state["cevaplar_ham"] = cevap_resp.text
